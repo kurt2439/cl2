@@ -1,26 +1,39 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Net::SMTP;
+use Net::SMTP::SSL;
+#send_authenticated_mail
+#Arguments: mailhost, sender, recipient, username, password, subject, body
+#All arguments are scalar variables, no lists allowed currently
+sub send_authenticated_mail{
+	my $mailhost=shift;
+	my $sender=shift;
+	my $recipient=shift;
+	my $username=shift;
+	my $password=shift;
 
-my $mailhost='mail.mandala-designs.com';
-my $recipient='chase1124@gmail.com';
+	#Open a mail process
+	my $smtps=Net::SMTP::SSL->new(
+		"$mailhost",
+		'Port' => '465',
+		'Debug' => '0',
+		);
+	unless ($smtps) {die "Could not connect to server\n"}
 
-#Open a mail process
-my $smtp=Net::SMTP->new(
-	'mailhost' => '$mailhost',
-	);
+	$smtps->auth("$username","$password") or die "Authentication failed\n";
 
-$smtp->auth('jchase@shambhala.com','chase02052');
-$smtp->mail($ENV{USER});
-$smtp->to("$recipient");
+	$smtps->mail($sender.'\n');
+	$smtps->to("$recipient");
 
-$smtp->data();
-    $smtp->datasend("To: James Chase\n");
-    $smtp->datasend("\n");
-    $smtp->datasend("A simple test message\n");
-    $smtp->dataend();
-    $smtp->quit;
+	$smtps->data();
+    	$smtps->datasend("From: $sender\n");
+    	$smtps->datasend("To: $recipient\n");
+    	$smtps->datasend("Subject: $subject\n");
+    	$smtps->datasend("\n");
+    	$smtps->datasend("$body\n");
+    	$smtps->dataend();
+    	$smtps->quit;
+}
 #Print formatting lines for the e-mail	
 #print SENDMAIL "From: Craigslist Finder <jchase\@thinkpad.local>\n";
 #print SENDMAIL "To: James Chase <$email_recipient>\n";

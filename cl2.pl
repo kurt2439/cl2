@@ -148,14 +148,8 @@ foreach my $query (keys %search_list){
 	#Skip any blank results
 	if ( ! defined $hashhack ){ next }
 	
-	#Open a mail process
-	open(SENDMAIL, "|/usr/lib/sendmail -oi -t")
-#	open(SENDMAIL, ">","/tmp/${query}-mail.txt")
-		or die "Can't fork for sendmail: $!\n";
 	#Print formatting lines for the e-mail	
-	print SENDMAIL "From: Craigslist Finder <jchase\@thinkpad.local>\n";
-	print SENDMAIL "To: James Chase <$email_recipient>\n";
-	print SENDMAIL "Subject: $query\n";
+	
 	print SENDMAIL "Content-Type: text/html; charset=ISO-8859-1\n";
 	print SENDMAIL "Content-Transfer-Encoding: quoted-printable\n";
 
@@ -280,4 +274,39 @@ sub result_hash_match{
 	}
 	print "hash not matched\n" if $debug;
 	return 0;
+}
+
+#send_authenticated_mail
+#Arguments: mailhost, sender, recipient, username, password, subject, body
+#All arguments are scalar variables, no lists allowed currently
+sub send_authenticated_mail{
+	my $mailhost=shift;
+	my $sender=shift;
+	my $recipient=shift;
+	my $username=shift;
+	my $password=shift;
+	my $subject=shift;
+	my $body=shift;
+
+	#Open a mail process
+	my $smtps=Net::SMTP::SSL->new(
+		"$mailhost",
+		'Port'=>'465',
+		'Debug'=>'0',
+	);
+	unless ($smtps) { die "Could not connect to server\n"}
+
+	$smtps->auth($username,$password) or die "Authentication failed\n";
+
+	$smtps->mail($sender.'\n');
+	$smtps->to($recipient);
+
+	$smtps->data();
+	$smtps->datasend("From: $sender\n");
+	$smtps->datasend("To: $recipient\n");
+	$smtps->datasend("Subject: $subject\n");
+	$smtps->datasend("\n");
+	$smtps->datasend("$body\n");
+	$smtps->dataend();
+	$smtps->quit;
 }
