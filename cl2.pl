@@ -33,13 +33,15 @@ my %search_type=(
 );
 
 my $output_file="/tmp/clresults";
-my $recipient="chase1124\@gmail.com";
-my $recipient="kurt2439\@aol.com";
-my $extra_recipient="";
+my $mailhost='smtp.gmail.com'; #Your SMTP Host
+my $sender="chase1124\@gmail.com"; #Envelope sender of e-mail
+my $recipient="chase1124\@gmail.com"; #Who the e-mail is going to -- only scalar right now
+my $username=$sender;  #Change this if your username for logging into SMTP is not the same as sender
+my $password="metro11"; #Your password for smtp
+my $extra_recipient=""; #Not used at the moment
 my $tracking_file="/tmp/database";
 my $error_file="/tmp/cl2.log";
 my $tmp_location="/tmp/";
-my $email_recipient="chase1124\@gmail.com";
 my @processed_results;
 
 #Vary the level of debugging...
@@ -142,7 +144,7 @@ foreach my $query (keys %search_list){
 
 #Now go through the results:
 foreach my $query (keys %search_list){
-	print $query."\n";
+	print "Checking found results for: ".$query."\n" if $debug;
 	my $hashhack=$search_results{$query};
 
 	#Skip any blank results
@@ -150,24 +152,28 @@ foreach my $query (keys %search_list){
 	
 	#Print formatting lines for the e-mail	
 	
-	print SENDMAIL "Content-Type: text/html; charset=ISO-8859-1\n";
-	print SENDMAIL "Content-Transfer-Encoding: quoted-printable\n";
+	my $extended_env_lines="Content-Type: text/html; charset=ISO-8859-1\n";
+	$extended_env_lines.="Content-Transfer-Encoding: quoted-printable\n";
 
 	#Print out the search results via email of each of the found results
 	foreach my $hash (keys %$hashhack){
+		print "E-mailing results for $hash\n" if $debug;
+		my $subject="$hash Results Found";
+		my $body;
 		my $hashhack_two=$$hashhack{$hash};
-		print SENDMAIL "<p>";
-		print SENDMAIL "<div><img src=3D\"http://images.craigslist.org/$search_results{$query}{$hash}{img}\" alt=3D\"$search_results{$query}{$hash}{img}\" title=3D\"$search_results{$query}{$hash}{img}\"><br clear=3D\"all\"><br clear=3D\"all\"></div>" if defined $search_results{$query}{$hash}{img};
-		print SENDMAIL "<div>PRICE: $$hashhack_two{price}</div>" if defined $$hashhack_two{price};
-		print SENDMAIL "<div>SUBJECT: $$hashhack_two{subject}</div>" if defined $$hashhack_two{subject};
-#		print SENDMAIL "SUBJECT: $search_results{$query}{$hash}{subject}\n" if defined $search_results{$query}{subject};
-		print SENDMAIL "<div>TOWN: $$hashhack_two{town}</div>" if defined $$hashhack_two{town};
-#		print SENDMAIL "TOWN: $search_results{$query}{$hash}{town}\n" if defined $search_results{$query}{town};
-		print SENDMAIL "<div>DATE: $search_results{$query}{$hash}{date}</div>" if defined $search_results{$query}{$hash}{date};
-		print SENDMAIL "<div>URL: $search_results{$query}{$hash}{url}Take me to your leader</a></div>\n" if defined $search_results{$query}{$hash}{url};
-		print SENDMAIL "</p>";
+		$body.="<p>";
+		$body.="<div><img src=3D\"http://images.craigslist.org/$search_results{$query}{$hash}{img}\" alt=3D\"$search_results{$query}{$hash}{img}\" title=3D\"$search_results{$query}{$hash}{img}\"><br clear=3D\"all\"><br clear=3D\"all\"></div>" if defined $search_results{$query}{$hash}{img};
+		$body.="<div>PRICE: $$hashhack_two{price}</div>" if defined $$hashhack_two{price};
+		$body.="<div>SUBJECT: $$hashhack_two{subject}</div>" if defined $$hashhack_two{subject};
+#		$body.="SUBJECT: $search_results{$query}{$hash}{subject}\n" if defined $search_results{$query}{subject};
+		$body.="<div>TOWN: $$hashhack_two{town}</div>" if defined $$hashhack_two{town};
+#		$body.="TOWN: $search_results{$query}{$hash}{town}\n" if defined $search_results{$query}{town};
+		$body.="<div>DATE: $search_results{$query}{$hash}{date}</div>" if defined $search_results{$query}{$hash}{date};
+		$body.="<div>URL: $search_results{$query}{$hash}{url}Take me to your leader</a></div>\n" if defined $search_results{$query}{$hash}{url};
+		$body.="</p>"; 
+		#Arguments: mailhost, sender, recipient, username, password, subject, extended envelope lines, body
+		send_authenticated_mail($mailhost,$sender,$recipient,$username,$password,$subject,$extended_env_lines,$body);
 	}
-	close(SENDMAIL)     or warn "sendmail didn't close nicely";
 }
 exit;
 
@@ -277,7 +283,7 @@ sub result_hash_match{
 }
 
 #send_authenticated_mail
-#Arguments: mailhost, sender, recipient, username, password, subject, body
+#Arguments: mailhost, sender, recipient, username, password, subject, extended envelope lines, body
 #All arguments are scalar variables, no lists allowed currently
 sub send_authenticated_mail{
 	my $mailhost=shift;
@@ -286,6 +292,7 @@ sub send_authenticated_mail{
 	my $username=shift;
 	my $password=shift;
 	my $subject=shift;
+	my $extended_env_lines=shift;
 	my $body=shift;
 
 	#Open a mail process
@@ -305,6 +312,7 @@ sub send_authenticated_mail{
 	$smtps->datasend("From: $sender\n");
 	$smtps->datasend("To: $recipient\n");
 	$smtps->datasend("Subject: $subject\n");
+	$smtps->datasend("$extended_env_lines\n");
 	$smtps->datasend("\n");
 	$smtps->datasend("$body\n");
 	$smtps->dataend();
