@@ -5,13 +5,11 @@ use Net::SMTP::SSL;
 
 my %search_results;
 my %search_list=(
-	'sega' => [ 'buy','free' ],
-	'nintendo' => [ 'buy','free' ],
-	'tv stand' => [ 'free' ],
-	'kayak' => [ 'buy','free' ],
-	'road bike' => [ 'buy' ],
-	'book shelf' => [ 'buy','free' ],
-	'tool box' => [ 'buy','free' ],
+#	'sega' => [ 'buy','free' ],
+#	'nintendo' => [ 'buy','free' ],
+#	'kayak' => [ 'buy','free' ],
+#	'road bike' => [ 'buy' ],
+#	'book shelf' => [ 'buy','free' ],
 	'foo fighters' => [ 'tickets-owner' ],
 );
 
@@ -166,6 +164,7 @@ foreach my $query (keys %search_list){
 	#Print out the search results via email of each of the found results
 	foreach my $hash (keys %$hashhack){
 		my $hashhack_two=$$hashhack{$hash};
+		print "Email Debug: $search_results{$query}{$hash}{url}\n";
 		$body.="<p>";
 		$body.="<div><img src=3D\"http://images.craigslist.org/$search_results{$query}{$hash}{img}\" alt=3D\"$search_results{$query}{$hash}{img}\" title=3D\"$search_results{$query}{$hash}{img}\"><br clear=3D\"all\"><br clear=3D\"all\"></div>" if defined $search_results{$query}{$hash}{img};
 		$body.="<div>PRICE: $$hashhack_two{price}</div>" if defined $$hashhack_two{price};
@@ -174,7 +173,7 @@ foreach my $query (keys %search_list){
 		$body.="<div>TOWN: $$hashhack_two{town}</div>" if defined $$hashhack_two{town};
 #		$body.="TOWN: $search_results{$query}{$hash}{town}\n" if defined $search_results{$query}{town};
 		$body.="<div>DATE: $search_results{$query}{$hash}{date}</div>" if defined $search_results{$query}{$hash}{date};
-		$body.="<div>URL: $search_results{$query}{$hash}{url}Take me to your leader</a></div>\n" if defined $search_results{$query}{$hash}{url};
+		$body.="<div>LINK: $search_results{$query}{$hash}{url}</div>\n" if defined $search_results{$query}{$hash}{url};
 		$body.="</p>"; 
 	}
 	
@@ -241,7 +240,7 @@ sub parse_result{
 		$result_hash{date}=$1;
 		$result_hash{date}=~s/^\s+//s;
 	}
-	if ($result=~m/(\<a href\=.*?\>)/){
+	if ($result=~m/\<a href\=\"(.*?)\"\>/){
 		$result_hash{url}=$1;
 	}
 	if ($result=~m/\<a href\=.*?\>(.*?)\-\<\/a\>/){
