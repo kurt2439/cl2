@@ -12,7 +12,7 @@ my %search_list=(
 	'road bike' => [ 'buy' ],
 	'book shelf' => [ 'buy','free' ],
 	'tool box' => [ 'buy','free' ],
-#	'norwood' => [ 'housing' ],
+	'foo fighters' => [ 'tickets-owner' ],
 );
 
 my %search_type=(
@@ -30,6 +30,11 @@ my %search_type=(
 		'item_start_tag' => '<p>',
 		'item_end_tag' => '\<\/p\>',
 		'search_url' => 'http://boston.craigslist.org/search/zip?query=QUERY&srchType=A&minAsk=&maxAsk=',
+	 },
+	'tickets-owner' => { 
+		'item_start_tag' => '<p>',
+		'item_end_tag' => '\<\/p\>',
+		'search_url' => 'http://boston.craigslist.org/search/tia?query=QUERY&catAbb=tix&srchType=A&minAsk=&maxAsk=',
 	 },
 );
 
@@ -133,11 +138,11 @@ foreach my $query (keys %search_list){
 				next;
 			}
 			$search_results{$query}{$hash}=parse_result($result);
-			print "IMG: $search_results{$query}{$hash}{img}\n" if ($debug && defined $search_results{$query}{$hash}{img});
-			print "URL: $search_results{$query}{$hash}{url}\n" if ($debug && defined $search_results{$query}{$hash}{url});
-			print "SUBJECT: $search_results{$query}{$hash}{subject}\n" if ($debug && defined $search_results{$query}{$hash}{subject});
-			print "TOWN: $search_results{$query}{$hash}{town}\n" if ($debug && defined $search_results{$query}{$hash}{town});
-			print "DATE: $search_results{$query}{$hash}{date}\n" if ($debug && defined $search_results{$query}{$hash}{town});
+			print "IMG: $search_results{$query}{$hash}{img}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{img});
+			print "URL: $search_results{$query}{$hash}{url}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{url});
+			print "SUBJECT: $search_results{$query}{$hash}{subject}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{subject});
+			print "TOWN: $search_results{$query}{$hash}{town}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{town});
+			print "DATE: $search_results{$query}{$hash}{date}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{town});
 			print $hash_write_handle "$hash\n";
 		}
 	}
@@ -147,6 +152,8 @@ foreach my $query (keys %search_list){
 foreach my $query (keys %search_list){
 	print "Checking found results for: ".$query."\n" if $debug;
 	my $hashhack=$search_results{$query};
+	my $subject="$query Results Found";
+	my $body;
 
 	#Skip any blank results
 	if ( ! defined $hashhack ){ next }
@@ -158,9 +165,6 @@ foreach my $query (keys %search_list){
 
 	#Print out the search results via email of each of the found results
 	foreach my $hash (keys %$hashhack){
-		print "E-mailing results for $hash\n" if $debug;
-		my $subject="$hash Results Found";
-		my $body;
 		my $hashhack_two=$$hashhack{$hash};
 		$body.="<p>";
 		$body.="<div><img src=3D\"http://images.craigslist.org/$search_results{$query}{$hash}{img}\" alt=3D\"$search_results{$query}{$hash}{img}\" title=3D\"$search_results{$query}{$hash}{img}\"><br clear=3D\"all\"><br clear=3D\"all\"></div>" if defined $search_results{$query}{$hash}{img};
@@ -172,9 +176,11 @@ foreach my $query (keys %search_list){
 		$body.="<div>DATE: $search_results{$query}{$hash}{date}</div>" if defined $search_results{$query}{$hash}{date};
 		$body.="<div>URL: $search_results{$query}{$hash}{url}Take me to your leader</a></div>\n" if defined $search_results{$query}{$hash}{url};
 		$body.="</p>"; 
-		#Arguments: mailhost, sender, recipient, username, password, subject, extended envelope lines, body
-		send_authenticated_mail($mailhost,$sender,$recipient,$username,$password,$subject,$extended_env_lines,$body);
 	}
+	
+	#Now that the body is built, send the mail out	
+	print "E-mailing results for $query\n" if $debug;
+	send_authenticated_mail($mailhost,$sender,$recipient,$username,$password,$subject,$extended_env_lines,$body);
 }
 exit;
 
