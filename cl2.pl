@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+use Net::SMTP::SSL;
 
 my %search_results;
 my %search_list=(
@@ -11,7 +12,7 @@ my %search_list=(
 	'road bike' => [ 'buy' ],
 	'book shelf' => [ 'buy','free' ],
 	'tool box' => [ 'buy','free' ],
-#	'norwood' => [ 'housing' ],
+	'foo fighters' => [ 'tickets-owner' ],
 );
 
 my %search_type=(
@@ -30,16 +31,23 @@ my %search_type=(
 		'item_end_tag' => '\<\/p\>',
 		'search_url' => 'http://boston.craigslist.org/search/zip?query=QUERY&srchType=A&minAsk=&maxAsk=',
 	 },
+	'tickets-owner' => { 
+		'item_start_tag' => '<p>',
+		'item_end_tag' => '\<\/p\>',
+		'search_url' => 'http://boston.craigslist.org/search/tia?query=QUERY&catAbb=tix&srchType=A&minAsk=&maxAsk=',
+	 },
 );
 
 my $output_file="/tmp/clresults";
-my $recipient="chase1124\@gmail.com";
-my $recipient="kurt2439\@aol.com";
-my $extra_recipient="";
+my $mailhost='smtp.gmail.com'; #Your SMTP Host
+my $sender="chase1124\@gmail.com"; #Envelope sender of e-mail
+my $recipient="chase1124\@gmail.com"; #Who the e-mail is going to -- only scalar right now
+my $username=$sender;  #Change this if your username for logging into SMTP is not the same as sender
+my $password="metro11"; #Your password for smtp
+my $extra_recipient=""; #Not used at the moment
 my $tracking_file="/tmp/database";
 my $error_file="/tmp/cl2.log";
 my $tmp_location="/tmp/";
-my $email_recipient="chase1124\@gmail.com";
 my @processed_results;
 
 #Vary the level of debugging...
@@ -130,11 +138,11 @@ foreach my $query (keys %search_list){
 				next;
 			}
 			$search_results{$query}{$hash}=parse_result($result);
-			print "IMG: $search_results{$query}{$hash}{img}\n" if ($debug && defined $search_results{$query}{$hash}{img});
-			print "URL: $search_results{$query}{$hash}{url}\n" if ($debug && defined $search_results{$query}{$hash}{url});
-			print "SUBJECT: $search_results{$query}{$hash}{subject}\n" if ($debug && defined $search_results{$query}{$hash}{subject});
-			print "TOWN: $search_results{$query}{$hash}{town}\n" if ($debug && defined $search_results{$query}{$hash}{town});
-			print "DATE: $search_results{$query}{$hash}{date}\n" if ($debug && defined $search_results{$query}{$hash}{town});
+			print "IMG: $search_results{$query}{$hash}{img}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{img});
+			print "URL: $search_results{$query}{$hash}{url}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{url});
+			print "SUBJECT: $search_results{$query}{$hash}{subject}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{subject});
+			print "TOWN: $search_results{$query}{$hash}{town}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{town});
+			print "DATE: $search_results{$query}{$hash}{date}\n" if ($debug > 1 && defined $search_results{$query}{$hash}{town});
 			print $hash_write_handle "$hash\n";
 		}
 	}
@@ -142,38 +150,37 @@ foreach my $query (keys %search_list){
 
 #Now go through the results:
 foreach my $query (keys %search_list){
-	print $query."\n";
+	print "Checking found results for: ".$query."\n" if $debug;
 	my $hashhack=$search_results{$query};
+	my $subject="$query Results Found";
+	my $body;
 
 	#Skip any blank results
 	if ( ! defined $hashhack ){ next }
 	
-	#Open a mail process
-	open(SENDMAIL, "|/usr/lib/sendmail -oi -t")
-#	open(SENDMAIL, ">","/tmp/${query}-mail.txt")
-		or die "Can't fork for sendmail: $!\n";
 	#Print formatting lines for the e-mail	
-	print SENDMAIL "From: Craigslist Finder <jchase\@thinkpad.local>\n";
-	print SENDMAIL "To: James Chase <$email_recipient>\n";
-	print SENDMAIL "Subject: $query\n";
-	print SENDMAIL "Content-Type: text/html; charset=ISO-8859-1\n";
-	print SENDMAIL "Content-Transfer-Encoding: quoted-printable\n";
+	
+	my $extended_env_lines="Content-Type: text/html; charset=ISO-8859-1\n";
+	$extended_env_lines.="Content-Transfer-Encoding: quoted-printable\n";
 
 	#Print out the search results via email of each of the found results
 	foreach my $hash (keys %$hashhack){
 		my $hashhack_two=$$hashhack{$hash};
-		print SENDMAIL "<p>";
-		print SENDMAIL "<div><img src=3D\"http://images.craigslist.org/$search_results{$query}{$hash}{img}\" alt=3D\"$search_results{$query}{$hash}{img}\" title=3D\"$search_results{$query}{$hash}{img}\"><br clear=3D\"all\"><br clear=3D\"all\"></div>" if defined $search_results{$query}{$hash}{img};
-		print SENDMAIL "<div>PRICE: $$hashhack_two{price}</div>" if defined $$hashhack_two{price};
-		print SENDMAIL "<div>SUBJECT: $$hashhack_two{subject}</div>" if defined $$hashhack_two{subject};
-#		print SENDMAIL "SUBJECT: $search_results{$query}{$hash}{subject}\n" if defined $search_results{$query}{subject};
-		print SENDMAIL "<div>TOWN: $$hashhack_two{town}</div>" if defined $$hashhack_two{town};
-#		print SENDMAIL "TOWN: $search_results{$query}{$hash}{town}\n" if defined $search_results{$query}{town};
-		print SENDMAIL "<div>DATE: $search_results{$query}{$hash}{date}</div>" if defined $search_results{$query}{$hash}{date};
-		print SENDMAIL "<div>URL: $search_results{$query}{$hash}{url}Take me to your leader</a></div>\n" if defined $search_results{$query}{$hash}{url};
-		print SENDMAIL "</p>";
+		$body.="<p>";
+		$body.="<div><img src=3D\"http://images.craigslist.org/$search_results{$query}{$hash}{img}\" alt=3D\"$search_results{$query}{$hash}{img}\" title=3D\"$search_results{$query}{$hash}{img}\"><br clear=3D\"all\"><br clear=3D\"all\"></div>" if defined $search_results{$query}{$hash}{img};
+		$body.="<div>PRICE: $$hashhack_two{price}</div>" if defined $$hashhack_two{price};
+		$body.="<div>SUBJECT: $$hashhack_two{subject}</div>" if defined $$hashhack_two{subject};
+#		$body.="SUBJECT: $search_results{$query}{$hash}{subject}\n" if defined $search_results{$query}{subject};
+		$body.="<div>TOWN: $$hashhack_two{town}</div>" if defined $$hashhack_two{town};
+#		$body.="TOWN: $search_results{$query}{$hash}{town}\n" if defined $search_results{$query}{town};
+		$body.="<div>DATE: $search_results{$query}{$hash}{date}</div>" if defined $search_results{$query}{$hash}{date};
+		$body.="<div>URL: $search_results{$query}{$hash}{url}Take me to your leader</a></div>\n" if defined $search_results{$query}{$hash}{url};
+		$body.="</p>"; 
 	}
-	close(SENDMAIL)     or warn "sendmail didn't close nicely";
+	
+	#Now that the body is built, send the mail out	
+	print "E-mailing results for $query\n" if $debug;
+	send_authenticated_mail($mailhost,$sender,$recipient,$username,$password,$subject,$extended_env_lines,$body);
 }
 exit;
 
@@ -280,4 +287,41 @@ sub result_hash_match{
 	}
 	print "hash not matched\n" if $debug;
 	return 0;
+}
+
+#send_authenticated_mail
+#Arguments: mailhost, sender, recipient, username, password, subject, extended envelope lines, body
+#All arguments are scalar variables, no lists allowed currently
+sub send_authenticated_mail{
+	my $mailhost=shift;
+	my $sender=shift;
+	my $recipient=shift;
+	my $username=shift;
+	my $password=shift;
+	my $subject=shift;
+	my $extended_env_lines=shift;
+	my $body=shift;
+
+	#Open a mail process
+	my $smtps=Net::SMTP::SSL->new(
+		"$mailhost",
+		'Port'=>'465',
+		'Debug'=>'0',
+	);
+	unless ($smtps) { die "Could not connect to server\n"}
+
+	$smtps->auth($username,$password) or die "Authentication failed\n";
+
+	$smtps->mail($sender.'\n');
+	$smtps->to($recipient);
+
+	$smtps->data();
+	$smtps->datasend("From: $sender\n");
+	$smtps->datasend("To: $recipient\n");
+	$smtps->datasend("Subject: $subject\n");
+	$smtps->datasend("$extended_env_lines\n");
+	$smtps->datasend("\n");
+	$smtps->datasend("$body\n");
+	$smtps->dataend();
+	$smtps->quit;
 }
